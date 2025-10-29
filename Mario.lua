@@ -1,7 +1,15 @@
 ---- EDITABLE PARAMETERS (you can change these)
 
+-- The port of the python server that will do the neural network computations.
+local PORT = 2022
+
 -- How many tiles the player can "see" in any direction.
 local VISION_SIZE = 6;
+
+
+
+---- LIBRARY IMPORTS
+local socket = require('socket')
 
 
 
@@ -123,7 +131,7 @@ function getInputs()
     -- Get all of the currently active sprites.
     local sprites = getSprites();
 
-    -- Build the input vector.
+    -- Build the input array.
     for dy=-VISION_SIZE,VISION_SIZE do
         for dx=-VISION_SIZE,VISION_SIZE do
             -- The tile (0 or 1) will be used as input.
@@ -143,34 +151,40 @@ function getInputs()
         end
     end
 
-    -- Return the input vector.
+    -- Return the inputs array.
     return inputs;
 end
 
--- A debugging function that will log the current input vector as an NxN matrix.
-function logInputs()
-    -- Clear the console so that we don't overflow it.
-    console.clear();
-    
+-- Will send the input vector to the python server.
+function sendInputs(sock)
     -- Get the network inputs.
     local inputs = getInputs();
 
-    -- Print the network inputs as a matrix.
-    for y=1,VISION_SIZE*2+1 do
-        local line = ""
-        for x=1,VISION_SIZE*2+1 do
-            if x==VISION_SIZE+1 and y==VISION_SIZE+1 then
-                -- Replace the center position with a '*'.
-                line = line .. " * "
-            else
-                -- Print the input value.
-                line = line .. string.format("%2d", inputs[(y-1)*(VISION_SIZE*2+1) + x]) .. " ";
-            end
-        end
-        
-        -- Log a single row at a time.
-        console.log(line);
+    -- Create a message string to send over TCP.
+    local message = ""
+    for i=1,#inputs do
+        message = message .. inputs[i] .. " "
     end
+    
+    -- Add a message terminator.
+    message = message .. "END"
+
+    -- Send the message.
+    sock:send(message);
+end
+
+
+
+---- CONNECT TO PYTHON SERVER
+
+-- Connect to the server.
+local sock = assert(socket.tcp());
+local success, err = sock:connect("localhost", PORT);
+
+-- If there was an error, abort.
+if not success then
+    print("[ERROR]: Could not connect to python server. Aborting.");
+    return; 
 end
 
 
@@ -178,14 +192,29 @@ end
 ---- MAIN GAME LOOP
 
 while true do
-    -- TODO: Remove. Get the controller inputs every frame.
+    -- Get the controller inputs every frame.
     keyInputs = input.get()
 
-    -- TODO: Remove. 
-    if keyInputs["Insert"] then
-        logInputs();
+    -- The escape key stops the script.
+    if keyInputs["Escape"] then break; end
+
+    -- Send the current network to the python server.
+    sendInputs(sock);
+
+    -- Wait for the server to finish processing.
+    local response, err = sock:receive();
+    if not response then
+        print("[ERROR]: Python server disconnected. Aborting.");
+        break; 
     end
 
-    -- Advance the frame
+    -- TODO: Collect key inputs from the server.
+
+    -- Advance the frame.
     emu.frameadvance();
 end
+
+
+
+---- GRACEFULLY CLOSE THE CONNECTION
+sock:close()
