@@ -54,16 +54,16 @@ end
 -- Check the tile (dx, dy) tiles away from mario. Returns 1 if there is a tile, 0 otherwise.
 function getTile(dx, dy)
     -- Get the (x,y) position of the tile in world coordinates.
-    local x = playerX + TILE_WIDTH*dx;
+    local x = playerX + SPRITE_WIDTH + TILE_WIDTH*dx;
     local y = playerY + TILE_WIDTH*dy;
 
     -- Get the (x,y) index of the tile in the current page.
-    local xIndex = math.floor((x % (PAGE_WIDTH*TILE_WIDTH)) / TILE_WIDTH + 0.5);
-    local yIndex = math.floor(y / TILE_WIDTH + 0.5);  
+    local xIndex = math.floor((x % (PAGE_WIDTH*TILE_WIDTH)) / TILE_WIDTH);
+    local yIndex = math.floor(y / TILE_WIDTH);  
 
     -- If either location is out out of the screen, return 1.
-    if xIndex >= PAGE_WIDTH or xIndex < 0 then return 1; end
-    if yIndex >= PAGE_HEIGHT or yIndex < 0 then return 1; end
+    if xIndex >= PAGE_WIDTH or x < 0 then return 1; end
+    if yIndex >= PAGE_HEIGHT or y < 0 then return 1; end
 
     -- The tile could be in one of two different "pages" in RAM.
     local page = math.floor(x / (PAGE_WIDTH*TILE_WIDTH)) % 2;
@@ -71,11 +71,11 @@ function getTile(dx, dy)
     -- Using the tile index and page index, find the address of the tile in RAM.
     -- Calcualted as (array_address + page_offset + y_row + x_col)
     local address = ADDRESS_TILES + page*PAGE_HEIGHT*PAGE_WIDTH + yIndex*PAGE_WIDTH + xIndex;
-
+    
     -- Decide if there is a tile at that address.
     local tileType = memory.readbyte(address);
     local isAir = tableContains(AIR_VALUES, tileType);
-
+    
     -- Return the result.
     if isAir then return 0; end
     return 1;
@@ -110,6 +110,7 @@ while true do
 
     -- TODO: Remove. Draw the player's position.
 	gui.drawText(10,30,"Position: (" .. playerX .. ", " .. playerY .. ")",0xFFFFFFFF,16);
+    gui.drawText(10,60,"Page:" .. memory.readbyte(ADDRESS_PAGE),0xFFFFFFFF,16);
 
     -- Advance the frame
     emu.frameadvance();
