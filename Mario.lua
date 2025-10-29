@@ -35,9 +35,6 @@ local AIR_VALUES = {0x00, 0x24, 0x25, 0xC2, 0XC3, 0xC5};
 -- table<string, boolean> : Keys that are currently being pressed.
 local keyInputs;
 
--- int, int : The player's position in world coordinates.
-local playerX, playerY;
-
 -- int : The number of inputs to the network.
 local inputSize = (VISION_SIZE*2+1)^2;
 
@@ -55,19 +52,20 @@ function tableContains(table, value)
   return false
 end
 
--- Get the player's position in world coordinates.
+-- Get the player's position (top left of sprite) in world coordinates.
 function getPlayerPosition()
-    -- Get the player's x and y position in the world. (Top left of mario).
-
     -- Calculated as (screen position + page_width*number_of_pages_cleared).
-    playerX = memory.readbyte(ADDRESS_HPOS) + (PAGE_WIDTH*TILE_WIDTH)*memory.readbyte(ADDRESS_PAGE);
+    local playerX = memory.readbyte(ADDRESS_HPOS) + (PAGE_WIDTH*TILE_WIDTH)*memory.readbyte(ADDRESS_PAGE);
     
     -- Calcualted as (screen position - mario_height).
-    playerY = memory.readbyte(ADDRESS_VPOS) - TILE_WIDTH;
+    local playerY = memory.readbyte(ADDRESS_VPOS) - TILE_WIDTH;
+
+    -- Return the player's position.
+    return playerX, playerY;
 end
 
 -- Check the tile (dx, dy) tiles away from mario. Returns 1 if it is a block, 0 if it is air.
-function getTile(dx, dy)
+function getTile(playerX, playerY, dx, dy)
     -- Get the (x,y) position of the tile in world coordinates.
     local x = playerX + SPRITE_WIDTH + TILE_WIDTH*dx;
     local y = playerY + TILE_WIDTH*dy;
@@ -120,7 +118,7 @@ function getInputs()
     local inputs = {};
 
     -- Get the player's position in world coordinates.
-    getPlayerPosition();
+    local playerX, playerY = getPlayerPosition();
 
     -- Get all of the currently active sprites.
     local sprites = getSprites();
@@ -129,7 +127,7 @@ function getInputs()
     for dy=-VISION_SIZE,VISION_SIZE do
         for dx=-VISION_SIZE,VISION_SIZE do
             -- The tile (0 or 1) will be used as input.
-            inputs[#inputs+1] = getTile(dx,dy);
+            inputs[#inputs+1] = getTile(playerX, playerY, dx,dy);
 
             -- Unless a sprite is in the space, and then -1 will be used.
             for i=1,#sprites do
