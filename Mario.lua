@@ -183,7 +183,7 @@ local success, err = sock:connect("localhost", PORT);
 
 -- If there was an error, abort.
 if not success then
-    print("[ERROR]: Could not connect to python server. Aborting.");
+    print("[NOTICE]: Could not connect to python server. Aborting.");
     return; 
 end
 
@@ -204,7 +204,7 @@ while true do
     -- Wait for the server to finish processing.
     local response, err = sock:receive();
     if not response then
-        print("[ERROR]: Python server disconnected. Aborting.");
+        print("[NOTICE]: Python server disconnected. Aborting.");
         break; 
     end
 

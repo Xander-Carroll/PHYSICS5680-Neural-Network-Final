@@ -15,6 +15,9 @@ import os, math, socket
 # The maximum ammount of data that the client might send at once.
 BUFFER_SIZE = 512
 
+# The maximum ammount of time between packouts without aborting (seconds).
+SOCKET_TIMEOUT_LENGTH = 4.0
+
 
 
 #### UTILITY FUNCTIONS
@@ -29,7 +32,7 @@ def logInputs(input):
 
     # Validate the input.
     if inputs[-1] != "END":
-        print("[WARNING]: Invalid input recieved from server")
+        print("[WARNING]: Invalid input recieved from server.")
         return
 
     # Get the "vision size".
@@ -41,7 +44,7 @@ def logInputs(input):
         for x in range(0,visionSize*2+1):
             if x==visionSize and y==visionSize:
                 # Replace the center position with a '*'.
-                line = line + " * "
+                line = line + "*  "
             else:
                 # Print the input value.
                 line = line + "{:2s}".format(inputs[y*(visionSize*2 + 1) + x]) + " "
@@ -67,19 +70,32 @@ frameCounter = 0
 with connection:
     print(f"[NOTICE]: Connection made by {clientAddress[0]}:{clientAddress[1]}")
 
+    # After making the initial connection, set a time limit on the connection.
+    connection.settimeout(SOCKET_TIMEOUT_LENGTH) 
+
     # The main loop. Wait for a network, process it, and send back inputs.
     while True:
-        # Wait for an incoming message.
-        data = connection.recv(BUFFER_SIZE).decode()
-        if not data:
-            print("[NOTICE]: Connection closed by client")
+        try:
+            # Wait for an incoming message.
+            data = connection.recv(BUFFER_SIZE).decode()
+            if not data:
+                print("[NOTICE]: Connection closed by client.")
+                break
+            
+            # TODO: Remove.
+            # Print every Xth message as a matrix.
+            frameCounter += 1
+            if(frameCounter % 30 == 0):
+                logInputs(data)
+
+            # After processing the message, send back a response.
+            connection.sendall(b"END\n")
+        except socket.timeout:
+            print("[NOTICE]: Connection timeout. Closing connection.")
             break
-        
-        # TODO: Remove.
-        # Print every Xth message as a matrix.
-        frameCounter += 1
-        if(frameCounter % 60 == 0):
-            logInputs(data)
-        
-        # After processing the message, send back a response.
-        connection.sendall(b"END\n")
+        except Exception as e:
+            print(f"[ERROR]: Socket Error: {e}")
+            break
+    
+    connection.close()
+    sock.close()
