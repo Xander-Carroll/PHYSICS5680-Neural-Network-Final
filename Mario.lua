@@ -82,7 +82,7 @@ function getTile(playerX, playerY, dx, dy)
     local xIndex = math.floor((x % (PAGE_WIDTH*TILE_WIDTH)) / TILE_WIDTH);
     local yIndex = math.floor(y / TILE_WIDTH);  
 
-    -- If either location is out out of the screen, return 1.
+    -- If the tile is outside of the screen, return 0.
     if xIndex >= PAGE_WIDTH or x < 0 then return 0; end
     if yIndex >= PAGE_HEIGHT or y < 0 then return 0; end
 
