@@ -24,6 +24,8 @@ local ADDRESS_SPRITES = 0x000F;     -- Array<int>*  : The sprite array
 local ADDRESS_EPAGE = 0x006E;       -- Array<int>*  : The page of the sprites within the level
 local ADDRESS_EHPOS = 0x0087;       -- Array<int>*  : The horizontal position of the sprites
 local ADDRESS_EVPOS = 0x00CF;       -- Array<int>*  : The vertical position of the sprites
+local ADDRESS_PSTATE = 0x000E;      -- int*         : The players current state (0x06 = player has died)
+local ADDRESS_PFSTATE = 0x001D;     -- int*         : The Players current float state (0x03 = player has won)
 
 -- How wide and tall a RAM page is in tiles.
 local PAGE_HEIGHT = 13;
@@ -122,11 +124,8 @@ function getSprites()
 end
 
 -- Return the input vector that will be fead to the neural network.
-function getInputs()
+function getInputs(playerX, playerY)
     local inputs = {};
-
-    -- Get the player's position in world coordinates.
-    local playerX, playerY = getPlayerPosition();
 
     -- Get all of the currently active sprites.
     local sprites = getSprites();
@@ -157,11 +156,22 @@ end
 
 -- Will send the input vector to the python server.
 function sendInputs(sock)
+    -- Get the player's position in world coordinates.
+    local playerX, playerY = getPlayerPosition();
+
     -- Get the network inputs.
-    local inputs = getInputs();
+    local inputs = getInputs(playerX, playerY);
 
     -- Create a message string to send over TCP.
     local message = ""
+
+    -- Add a boolean indicating if the player has won.
+    local playerWin = (memory.readbyte(ADDRESS_PFSTATE) == 0x03) and 1 or 0
+    message = message .. playerWin .. " "
+
+    -- Add the player's horizontal position.
+    message = message .. playerX .. " "
+
     for i=1,#inputs do
         message = message .. inputs[i] .. " "
     end
