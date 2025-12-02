@@ -4,7 +4,10 @@
 local PORT = 2022
 
 -- How many tiles the player can "see" in any direction.
-local VISION_SIZE = 4;
+local VISION_SIZE = 6;
+
+-- How many frames between processing the data.
+local SEND_INTERVAL = 5;
 
 
 
@@ -233,7 +236,7 @@ while true do
     -- The escape key stops the script.
     if keyInputs["Escape"] then break; end
 
-    if currentFrame % 5 == 0 then
+    if currentFrame % SEND_INTERVAL == 0 then
         -- Send the current network to the python server.
         sendInputs(sock);
 

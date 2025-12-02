@@ -5,7 +5,7 @@ PORT = 2022
 
 # The number of hidden layers and neurons in those layers of the network.
 HIDDEN_LAYERS = 2
-HIDDEN_NODES = 64
+HIDDEN_NODES = 128
 
 # How heavily weighted each part of the reward function is.
 W_DISTANCE = 10
@@ -16,7 +16,7 @@ W_WIN = 2000.0
 GAMMA = 0.95 
 
 # The percentage of the time that a random action will be taken (0 to use only the trained network).
-EPSILON = 0.01
+EPSILON = 0.1
 
 # The q-value we have to meet to actually take an action.
 ACTION_THRESHOLD = 0.5
@@ -118,7 +118,7 @@ def updateNetwork(prevState, prevActions, reward, currentState):
     opt.apply_gradients(zip(grads, qNetwork.trainable_variables))
 
 # Given the state of the game, determines the best actions (buttons) to press. Called each frame.
-def processFrame(data, currentFrame):
+def processFrame(connection, data, currentFrame):
     global qNetwork, prevState, prevActions
 
     # Split the data into an array.
@@ -152,6 +152,15 @@ def processFrame(data, currentFrame):
     if (BUTTON_LIST.index("Up") in actions) and (BUTTON_LIST.index("Down") in actions): actions.remove(BUTTON_LIST.index("Down"))
     if (BUTTON_LIST.index("Left") in actions) and (BUTTON_LIST.index("Right") in actions): actions.remove(BUTTON_LIST.index("Left"))
 
+
+    # Send the buttons to the network
+    actionList = [BUTTON_LIST[i] for i in actions]
+    actionList.append("END\n")
+    actionString = " ".join(actionList)
+
+    # Send back a response.
+    connection.sendall(actionString.encode())
+
     # Update the network.
     if prevState is not None:
         reward = currentReward(playerWin, playerX, currentFrame)
@@ -163,9 +172,6 @@ def processFrame(data, currentFrame):
     # Save for the next frame.
     prevState = state
     prevActions = actions
-
-    # Return the buttons that should be pressed this frame.
-    return [BUTTON_LIST[i] for i in actions]
 
 
 
@@ -203,13 +209,8 @@ def main():
                 # Advance the current frame.
                 currentFrame += 1
 
-                # Process the sent data and decide what buttons to press.
-                actionList = processFrame(data, currentFrame)
-                actionList.append("END\n")
-                actionString = " ".join(actionList)
-
-                # Send back a response.
-                connection.sendall(actionString.encode())
+                # Process the sent data, decide what buttons to press, and update the network.
+                processFrame(connection, data, currentFrame)
 
             except socket.timeout:
                 print("[NOTICE]: Connection timeout. Closing connection.")
