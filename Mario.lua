@@ -27,8 +27,7 @@ local ADDRESS_SPRITES = 0x000F;     -- Array<int>*  : The sprite array
 local ADDRESS_EPAGE = 0x006E;       -- Array<int>*  : The page of the sprites within the level
 local ADDRESS_EHPOS = 0x0087;       -- Array<int>*  : The horizontal position of the sprites
 local ADDRESS_EVPOS = 0x00CF;       -- Array<int>*  : The vertical position of the sprites
-local ADDRESS_PSTATE = 0x000E;      -- int*         : The players current state (0x06 = player has died)
-local ADDRESS_PFSTATE = 0x001D;     -- int*         : The Players current float state (0x03 = player has won)
+local ADDRESS_PSTATE = 0x000E;      -- int*         : The player's state (normal, dying, climbing, etc)
 
 -- How wide and tall a RAM page is in tiles.
 local PAGE_HEIGHT = 13;
@@ -41,6 +40,8 @@ local TILE_WIDTH = 16;
 -- The tile values which will be considered "air".
 local AIR_VALUES = {0x00, 0x24, 0x25, 0xC2, 0XC3, 0xC5};
 
+-- The state values which will be considered a "reset".
+local RESET_VALUES = {0x04, 0x05, 0x06, 0x0b};
 
 
 ---- SCRIPT VARIABLES
@@ -186,7 +187,7 @@ function sendInputs(sock)
     local message = ""
 
     -- Add a boolean indicating if the player has won.
-    local playerWin = (memory.readbyte(ADDRESS_PFSTATE) == 0x03) and 1 or 0
+    local playerWin = (memory.readbyte(ADDRESS_PSTATE) == 0x04) and 1 or 0
     message = message .. playerWin .. " "
 
     -- Add the player's horizontal position.
@@ -236,7 +237,10 @@ while true do
     -- The escape key stops the script.
     if keyInputs["Escape"] then break; end
 
-    if currentFrame % SEND_INTERVAL == 0 then
+    -- If the player wins or dies we are going to process the frame, then reset.
+    local shouldReset = tableContains(RESET_VALUES, memory.readbyte(ADDRESS_PSTATE));
+
+    if currentFrame % SEND_INTERVAL == 0 or shouldReset then
         -- Send the current network to the python server.
         sendInputs(sock);
 
@@ -249,6 +253,11 @@ while true do
 
         -- Collect key outputs from the server and use them as joypad inputs.
         controller = createControllerMap(response);
+    
+        -- Reset if the player has won or died.
+        if shouldReset then 
+            savestate.loadslot(1); 
+        end
     end
 
     -- Advance the frame.
