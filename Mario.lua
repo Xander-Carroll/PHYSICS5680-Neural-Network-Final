@@ -225,6 +225,8 @@ sock:setoption("tcp-nodelay", true)
 
 ---- MAIN GAME LOOP
 
+savestate.loadslot(1); 
+
 currentFrame = 0
 controller = {};
 
