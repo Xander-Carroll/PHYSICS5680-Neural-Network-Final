@@ -8,9 +8,9 @@ HIDDEN_LAYERS = 2
 HIDDEN_NODES = 128
 
 # How heavily weighted each part of the reward function is.
-W_DISTANCE = 10
+W_DISTANCE = 100
 W_TIME = 0.1
-W_WIN = 2000.0
+W_WIN = 20000.0
 
 # How much long term reward matters (near 1 to prioritize long-term gain).
 GAMMA = 0.95 
@@ -26,7 +26,7 @@ ACTION_THRESHOLD = 0.5
 #### LIBRARY IMPORTS
 
 # Standard library imports
-import os, math, socket
+import math, socket
 
 # External library imports
 import numpy as np
@@ -164,7 +164,6 @@ def processFrame(connection, data, currentFrame):
     # Update the network.
     if prevState is not None:
         reward = currentReward(playerWin, playerX, currentFrame)
-        if currentFrame % 10 == 0: print(reward)
         prevActionsBool = np.zeros(len(BUTTON_LIST), dtype=bool)
         prevActionsBool[prevActions] = True
         updateNetwork(prevState, prevActionsBool, reward, state)
@@ -178,7 +177,7 @@ def processFrame(connection, data, currentFrame):
 #### CREATE PYTHON SERVER
 
 def main():
-    # The number of frames that have been processed
+    # The number of frames that have been processed.
     currentFrame = 0
 
     # Create and bind the socket.
