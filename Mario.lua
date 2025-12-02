@@ -186,9 +186,10 @@ function sendInputs(sock)
     -- Create a message string to send over TCP.
     local message = ""
 
-    -- Add a boolean indicating if the player has won.
-    local playerWin = (memory.readbyte(ADDRESS_PSTATE) == 0x04) and 1 or 0
-    message = message .. playerWin .. " "
+    -- Add a variable indicating if the player has won (1) or died (2).
+    local playerState = (memory.readbyte(ADDRESS_PSTATE) == 0x04) and 1 or 0
+    playerState = (memory.readbyte(ADDRESS_PSTATE) == 0x06 or memory.readbyte(ADDRESS_PSTATE) == 0x0b) and 2 or playerState
+    message = message .. playerState .. " "
 
     -- Add the player's horizontal position.
     message = message .. playerX .. " "

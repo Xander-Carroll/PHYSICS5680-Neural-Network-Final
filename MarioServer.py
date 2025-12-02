@@ -8,9 +8,11 @@ HIDDEN_LAYERS = 2
 HIDDEN_NODES = 128
 
 # How heavily weighted each part of the reward function is.
-W_DISTANCE = 100
 W_TIME = 0.1
-W_WIN = 20000.0
+W_DISTANCE = 100
+W_DIED = 1000.0
+W_WIN = 100000.0
+
 
 # How much long term reward matters (near 1 to prioritize long-term gain).
 GAMMA = 0.95 
@@ -64,6 +66,9 @@ visionSize = None
 prevState = None
 prevActions = None
 
+# The number of frames that have been processed.
+currentFrame = 0
+
 # Optimizer function
 opt = optimizers.Adam(1e-4)
 
@@ -72,12 +77,13 @@ opt = optimizers.Adam(1e-4)
 #### UTILITY FUNCTIONS
 
 # The reward based on these parameters.
-def currentReward(playerWin, playerX, currentFrame):
+def currentReward(playerWin, playerDied, playerX, currentFrame):
     reward = 0
 
     reward += (playerX / MAX_LEVEL_WIDTH) * W_DISTANCE
     reward -= (currentFrame / MAX_LEVEL_TIME) * W_TIME
     if playerWin: reward += W_WIN
+    if playerDied: reward -= W_DIED
 
     return reward
 
@@ -118,8 +124,8 @@ def updateNetwork(prevState, prevActions, reward, currentState):
     opt.apply_gradients(zip(grads, qNetwork.trainable_variables))
 
 # Given the state of the game, determines the best actions (buttons) to press. Called each frame.
-def processFrame(connection, data, currentFrame):
-    global qNetwork, prevState, prevActions
+def processFrame(connection, data):
+    global qNetwork, prevState, prevActions, currentFrame
 
     # Split the data into an array.
     inputs = data.split()
@@ -135,6 +141,7 @@ def processFrame(connection, data, currentFrame):
 
     # Extract player data from the input message.
     playerWin = int(inputs[0]) == 1
+    playerDied = int(inputs[0]) == 2
     playerX = int(inputs[1])
 
     # Extract level data from the input message.
@@ -161,9 +168,13 @@ def processFrame(connection, data, currentFrame):
     # Send back a response.
     connection.sendall(actionString.encode())
 
+    # Reset the frame counter if the player won or died.
+    if playerWin or playerDied:
+        currentFrame = 0
+
     # Update the network.
     if prevState is not None:
-        reward = currentReward(playerWin, playerX, currentFrame)
+        reward = currentReward(playerWin, playerDied, playerX, currentFrame)
         prevActionsBool = np.zeros(len(BUTTON_LIST), dtype=bool)
         prevActionsBool[prevActions] = True
         updateNetwork(prevState, prevActionsBool, reward, state)
@@ -177,8 +188,7 @@ def processFrame(connection, data, currentFrame):
 #### CREATE PYTHON SERVER
 
 def main():
-    # The number of frames that have been processed.
-    currentFrame = 0
+    global currentFrame
 
     # Create and bind the socket.
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -209,7 +219,7 @@ def main():
                 currentFrame += 1
 
                 # Process the sent data, decide what buttons to press, and update the network.
-                processFrame(connection, data, currentFrame)
+                processFrame(connection, data)
 
             except socket.timeout:
                 print("[NOTICE]: Connection timeout. Closing connection.")
