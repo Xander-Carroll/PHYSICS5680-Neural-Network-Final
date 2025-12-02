@@ -5,7 +5,7 @@ PORT = 2022
 
 # The number of hidden layers and neurons in those layers of the network.
 HIDDEN_LAYERS = 2
-HIDDEN_NODES = 128
+HIDDEN_NODES = 64
 
 # How heavily weighted each part of the reward function is.
 W_DISTANCE = 10
@@ -41,10 +41,10 @@ from tensorflow.keras import layers, Model, optimizers
 BUFFER_SIZE = 512
 
 # The maximum ammount of time between packouts without aborting (seconds).
-SOCKET_TIMEOUT_LENGTH = 4.0
+SOCKET_TIMEOUT_LENGTH = 10.0
 
 # The buttons that the agent can learn to press.
-BUTTON_LIST = ["UP", "DOWN", "LEFT", "RIGHT", "A", "B"]
+BUTTON_LIST = ["Up", "Down", "Left", "Right", "A", "B"]
 
 # The width of the longest level (pixels) and time limit of the longest level (frames).
 MAX_LEVEL_WIDTH = 6656
@@ -59,9 +59,6 @@ qNetwork = None
 
 # The "vision-size" that is being used. Is determined by the length of the sent matrix.
 visionSize = None
-
-# The current frame
-currentFrame = 0
 
 # Previous network information
 prevState = None
@@ -121,9 +118,8 @@ def updateNetwork(prevState, prevActions, reward, currentState):
     opt.apply_gradients(zip(grads, qNetwork.trainable_variables))
 
 # Given the state of the game, determines the best actions (buttons) to press. Called each frame.
-def processFrame(data):
-    global qNetwork, currentFrame, prevState, prevActions
-    currentFrame += 1
+def processFrame(data, currentFrame):
+    global qNetwork, prevState, prevActions
 
     # Split the data into an array.
     inputs = data.split()
@@ -147,14 +143,19 @@ def processFrame(data):
 
     # Take the action dictated by the network.
     qVals = qNetwork(state[np.newaxis,...])[0].numpy()
-    actions = [i for i, q in enumerate(qVals) if q > ACTION_THRESHOLD]
+    actions = np.where(qVals > ACTION_THRESHOLD)[0]
+    
+    # Per-button greedy exploration. Invert each action EPSILON % of the time.
+    actions = [i for i in range(len(BUTTON_LIST)) if (i in actions) ^ (np.random.rand() < EPSILON)]
 
-    # Per-button greedy exploration. Take a random action.
-    actions = [i if np.random.rand() > EPSILON else np.random.randint(2) for i in range(len(BUTTON_LIST))]
+    # We can't press oppisite directions at the same time in real life.
+    if (BUTTON_LIST.index("Up") in actions) and (BUTTON_LIST.index("Down") in actions): actions.remove(BUTTON_LIST.index("Down"))
+    if (BUTTON_LIST.index("Left") in actions) and (BUTTON_LIST.index("Right") in actions): actions.remove(BUTTON_LIST.index("Left"))
 
     # Update the network.
     if prevState is not None:
         reward = currentReward(playerWin, playerX, currentFrame)
+        if currentFrame % 10 == 0: print(reward)
         prevActionsBool = np.zeros(len(BUTTON_LIST), dtype=bool)
         prevActionsBool[prevActions] = True
         updateNetwork(prevState, prevActionsBool, reward, state)
@@ -171,7 +172,8 @@ def processFrame(data):
 #### CREATE PYTHON SERVER
 
 def main():
-    global currentFrame
+    # The number of frames that have been processed
+    currentFrame = 0
 
     # Create and bind the socket.
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -198,13 +200,16 @@ def main():
                     print("[NOTICE]: Connection closed by client.")
                     break
 
+                # Advance the current frame.
+                currentFrame += 1
+
                 # Process the sent data and decide what buttons to press.
-                actionList = processFrame(data)
+                actionList = processFrame(data, currentFrame)
+                actionList.append("END\n")
                 actionString = " ".join(actionList)
-                
+
                 # Send back a response.
-                if currentFrame%60==0: print(actionString)
-                connection.sendall(b"END\n")
+                connection.sendall(actionString.encode())
 
             except socket.timeout:
                 print("[NOTICE]: Connection timeout. Closing connection.")

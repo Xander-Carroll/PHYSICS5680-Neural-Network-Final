@@ -4,7 +4,7 @@
 local PORT = 2022
 
 -- How many tiles the player can "see" in any direction.
-local VISION_SIZE = 6;
+local VISION_SIZE = 4;
 
 
 
@@ -60,6 +60,23 @@ function tableContains(table, value)
         end
     end
   return false
+end
+
+-- Returns a table with all the keys listed in the string as True and False otherwise.
+function createControllerMap(outputString)
+    -- An output table with every key marked as "False".
+    local outputTable = {};
+
+    -- For each word in the output string.
+    for key in outputString:gmatch("%S+") do
+        -- Until the "END" keyword.
+        if key ~= "END" then
+            -- Mark that key as "True"
+            outputTable["P1 " .. key] = true;
+        end
+    end
+
+    return outputTable;
 end
 
 -- Get the player's position (top left of sprite) in world coordinates.
@@ -197,30 +214,42 @@ if not success then
     return; 
 end
 
+-- Set socket options.
+sock:settimeout(-1)
+sock:setoption("tcp-nodelay", true)
 
 
 ---- MAIN GAME LOOP
 
+currentFrame = 0
+controller = {};
+
 while true do
+    currentFrame = currentFrame + 1;
+
     -- Get the controller inputs every frame.
     keyInputs = input.get()
 
     -- The escape key stops the script.
     if keyInputs["Escape"] then break; end
 
-    -- Send the current network to the python server.
-    sendInputs(sock);
+    if currentFrame % 5 == 0 then
+        -- Send the current network to the python server.
+        sendInputs(sock);
 
-    -- Wait for the server to finish processing.
-    local response, err = sock:receive();
-    if not response then
-        print("[NOTICE]: Python server disconnected. Aborting.");
-        break; 
+        -- Wait for the server to finish processing.
+        local response, err = sock:receive();
+        if not response then
+            print("[NOTICE]: Python server disconnected. Aborting.");
+            break; 
+        end
+
+        -- Collect key outputs from the server and use them as joypad inputs.
+        controller = createControllerMap(response);
     end
 
-    -- TODO: Collect key inputs from the server.
-
     -- Advance the frame.
+    joypad.set(controller)
     emu.frameadvance();
 end
 
