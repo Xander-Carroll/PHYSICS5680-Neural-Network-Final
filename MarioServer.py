@@ -23,12 +23,15 @@ EPSILON = 0.1
 # The q-value we have to meet to actually take an action.
 ACTION_THRESHOLD = 0.5
 
+# CSV file to store rewards (set to None for no log file).
+REWARD_LOG_FILE = "reward-log.csv"
+
 
 
 #### LIBRARY IMPORTS
 
 # Standard library imports
-import math, socket
+import os, csv, math, socket
 
 # External library imports
 import numpy as np
@@ -78,13 +81,21 @@ opt = optimizers.Adam(1e-4)
 
 # The reward based on these parameters.
 def currentReward(playerWin, playerDied, playerX, currentFrame):
-    reward = 0
 
+    # Calculate the reward.
+    reward = 0
     reward += (playerX / MAX_LEVEL_WIDTH) * W_DISTANCE
     reward -= (currentFrame / MAX_LEVEL_TIME) * W_TIME
     if playerWin: reward += W_WIN
     if playerDied: reward -= W_DIED
 
+    # Log the reward and frame to CSV.
+    if REWARD_LOG_FILE != None:
+        with open(REWARD_LOG_FILE, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([currentFrame, reward])
+
+    # Return the reward.
     return reward
 
 # Creates and returns the Q-network model using TensorFlow.
@@ -189,6 +200,13 @@ def processFrame(connection, data):
 
 def main():
     global currentFrame
+
+    # Initialize CSV file with header if it doesn't exist
+    if REWARD_LOG_FILE != None:
+        if not os.path.exists(REWARD_LOG_FILE):
+            with open(REWARD_LOG_FILE, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(["frame", "reward"])
 
     # Create and bind the socket.
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
