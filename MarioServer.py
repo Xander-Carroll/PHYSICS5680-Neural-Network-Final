@@ -179,10 +179,6 @@ def processFrame(connection, data):
     # Send back a response.
     connection.sendall(actionString.encode())
 
-    # Reset the frame counter if the player won or died.
-    if playerWin or playerDied:
-        currentFrame = 0
-
     # Update the network.
     if prevState is not None:
         reward = currentReward(playerWin, playerDied, playerX, currentFrame)
